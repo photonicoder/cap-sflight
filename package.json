@@ -4,8 +4,9 @@
   "description": "CAP flight demo scenario",
   "repository": "https://github.com/SAP-samples/cap-sflight",
   "dependencies": {
+    "@sap/cds": "git+https://github.tools.sap/cap/cds.git",
+    "@sap/cds-dk": "^4.3.3",
     "@sap/audit-logging": "^5.0.0",
-    "@sap/cds": "^5.4.5",
     "hdb": "^0.18.3",
     "@sap/xssec": "^3.2.7",
     "express": "^4",
@@ -31,8 +32,14 @@
   },
   "cds": {
     "requires": {
+      "extensibility": {
+        "kind": "uiflex"
+      },
       "db": {
-        "kind": "sql"
+        "kind": "sqlite",
+        "credentials": {
+          "database": "sqlite.db"
+        }
       },
       "uaa": {
         "kind": "xsuaa"
