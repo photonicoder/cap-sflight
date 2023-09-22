@@ -1,20 +1,23 @@
-const cds = require ('@sap/cds'); require('./workarounds')
+import * as cds from '@sap/cds';
+require('./workarounds')
+export class TravelService extends cds.ApplicationService {
+private _update_totals4: Function = () => undefined; // forward declaration
 
-class TravelService extends cds.ApplicationService {
-init() {
+
+async init() {
 
   /**
    * Reflect definitions from the service's CDS model
    */
-  const { Travel, Booking, BookingSupplement } = this.entities
-
+  const { Travel } = await import('#cds-models/TravelService')
+  const { Booking, BookingSupplement } = await import('#cds-models/sap/fe/cap/travel')
 
   /**
    * Fill in primary keys for new Travels.
    * Note: In contrast to Bookings and BookingSupplements that has to happen
    * upon SAVE, as multiple users could create new Travels concurrently.
    */
-  this.before ('CREATE', 'Travel', async req => {
+  this.before ('CREATE', Travel, async req => {
     const { maxID } = await SELECT.one `max(TravelID) as maxID` .from (Travel)
     req.data.TravelID = maxID + 1
   })
@@ -23,9 +26,10 @@ init() {
   /**
    * Fill in defaults for new Bookings when editing Travels.
    */
-  this.before ('NEW', 'Booking.drafts', async (req) => {
+  // FIXME: TS v
+  this.before ('NEW', 'Booking.drafts' as unknown as typeof Booking, async (req) => {
     const { to_Travel_TravelUUID } = req.data
-    const { status } = await SELECT `TravelStatus_code as status` .from (Travel.drafts, to_Travel_TravelUUID)
+    const { status } = await SELECT `TravelStatus_code as status` .from ('Travel.drafts', to_Travel_TravelUUID)
     if (status === 'X') throw req.reject (400, 'Cannot add new bookings to rejected travels.')
     const { maxID } = await SELECT.one `max(BookingID) as maxID` .from (Booking.drafts) .where ({to_Travel_TravelUUID})
     req.data.BookingID = maxID + 1
@@ -37,7 +41,8 @@ init() {
   /**
    * Fill in defaults for new BookingSupplements when editing Travels.
    */
-  this.before ('NEW', 'BookingSupplement.drafts', async (req) => {
+  // FIXME: TS v
+  this.before ('NEW', 'BookingSupplement.drafts' as unknown as typeof BookingSupplement, async (req) => {
     const { to_Booking_BookingUUID } = req.data
     const { maxID } = await SELECT.one `max(BookingSupplementID) as maxID` .from (BookingSupplement.drafts) .where ({to_Booking_BookingUUID})
     req.data.BookingSupplementID = maxID + 1
@@ -47,8 +52,10 @@ init() {
   /**
    * Changing Booking Fees is only allowed for not yet accapted Travels.
    */
-  this.before ('UPDATE', 'Travel.drafts', async (req) => { if ('BookingFee' in req.data) {
-    const { status } = await SELECT.one `TravelStatus_code as status` .from (req.subject)
+  // FIXME: TS v
+  this.before ('UPDATE', 'Travel.drafts' as unknown as typeof Travel, async (req) => { if ('BookingFee' in req.data) {
+    // FIXME: TS v
+    const { status } = await SELECT.one `TravelStatus_code as status` .from (req.subject as unknown as typeof Travel)
     if (status === 'A') req.reject(400, 'Booking fee can not be updated for accepted travels.', 'BookingFee')
   }})
 
@@ -56,7 +63,8 @@ init() {
   /**
    * Update the Travel's TotalPrice when its BookingFee is modified.
    */
-  this.after ('UPDATE', 'Travel.drafts', (_,req) => { if ('BookingFee' in req.data) {
+  // FIXME: TS v
+  this.after ('UPDATE', 'Travel.drafts' as unknown as typeof Travel, (_,req) => { if ('BookingFee' in req.data) {
     return this._update_totals4 (req.data.TravelUUID)
   }})
 
@@ -64,9 +72,11 @@ init() {
   /**
    * Update the Travel's TotalPrice when a Booking's FlightPrice is modified.
    */
-  this.after ('UPDATE', 'Booking.drafts', async (_,req) => { if ('FlightPrice' in req.data) {
+  // FIXME: TS v
+  this.after ('UPDATE', 'Booking.drafts' as unknown as typeof Booking, async (_,req) => { if ('FlightPrice' in req.data) {
     // We need to fetch the Travel's UUID for the given Booking target
-    const { travel } = await SELECT.one `to_Travel_TravelUUID as travel` .from (req.subject)
+    // FIXME: TS v
+    const { travel } = await SELECT.one `to_Travel_TravelUUID as travel` .from (req.subject as unknown as typeof Booking)
     return this._update_totals4 (travel)
   }})
 
@@ -74,7 +84,8 @@ init() {
   /**
    * Update the Travel's TotalPrice when a Supplement's Price is modified.
    */
-  this.after ('UPDATE', 'BookingSupplement.drafts', async (_,req) => { if ('Price' in req.data) {
+  // FIXME: TS v
+  this.after ('UPDATE', 'BookingSupplement.drafts' as unknown as typeof BookingSupplement, async (_,req) => { if ('Price' in req.data) {
     // We need to fetch the Travel's UUID for the given Supplement target
     const { travel } = await SELECT.one `to_Travel_TravelUUID as travel` .from (Booking.drafts)
       .where `BookingUUID = ${ SELECT.one `to_Booking_BookingUUID` .from (BookingSupplement.drafts).where({BookSupplUUID:req.data.BookSupplUUID}) }`
@@ -86,11 +97,12 @@ init() {
   /**
    * Update the Travel's TotalPrice when a Booking Supplement is deleted.
    */
-  this.on('CANCEL', BookingSupplement.drafts, async (req, next) => {
+  // FIXME: TS v
+  this.on('CANCEL', 'BookingSupplement.drafts' as unknown as typeof BookingSupplement, async (req, next) => {
     // Find out which travel is affected before the delete
     const { BookSupplUUID } = req.data
     const { to_Travel_TravelUUID } = await SELECT.one
-      .from(BookingSupplement.drafts, ['to_Travel_TravelUUID'])
+      .from('BookingSupplement.drafts', ['to_Travel_TravelUUID'])
       .where({ BookSupplUUID })
     // Delete handled by generic handlers
     const res = await next()
@@ -102,11 +114,12 @@ init() {
   /**
    * Update the Travel's TotalPrice when a Booking is deleted.
    */
-  this.on('CANCEL', Booking.drafts, async (req, next) => {
+  // FIXME: TS v
+  this.on('CANCEL', 'Bookings.drafts' as unknown as typeof Booking, async (req, next) => {
     // Find out which travel is affected before the delete
     const { BookingUUID } = req.data
     const { to_Travel_TravelUUID } = await SELECT.one
-      .from(Booking.drafts, ['to_Travel_TravelUUID'])
+      .from('Booking.drafts', ['to_Travel_TravelUUID'])
       .where({ BookingUUID })
     // Delete handled by generic handlers
     const res = await next()
@@ -119,8 +132,10 @@ init() {
   /**
    * Helper to re-calculate a Travel's TotalPrice from BookingFees, FlightPrices and Supplement Prices.
    */
-  this._update_totals4 = function (travel) {
+  this._update_totals4 = function (travel: typeof Travel) {
     // Using plain native SQL for such complex queries
+    // FIXME: TS v
+    // @ts-ignore
     return cds.run(`UPDATE ${Travel.drafts} SET
       TotalPrice = coalesce(BookingFee,0)
       + ( SELECT coalesce (sum(FlightPrice),0) from ${Booking.drafts} where to_Travel_TravelUUID = TravelUUID )
@@ -132,7 +147,7 @@ init() {
   /**
    * Validate a Travel's edited data before save.
    */
-  this.before ('SAVE', 'Travel', req => {
+  this.before ('SAVE', Travel, req => {
     const { BeginDate, EndDate, BookingFee, to_Agency_AgencyID, to_Customer_CustomerID, to_Booking, TravelStatus_code } = req.data, today = (new Date).toISOString().slice(0,10)
 
     // validate only not rejected travels
@@ -143,7 +158,7 @@ init() {
       if (!to_Agency_AgencyID) req.error(400, "Enter a travel agency", "in/to_Agency_AgencyID")
       if (!to_Customer_CustomerID) req.error(400, "Enter a customer", "in/to_Customer_CustomerID")
 
-      for (const booking of to_Booking) {
+      for (const booking of to_Booking ?? []) {
         const { BookingUUID, ConnectionID, FlightDate, FlightPrice, BookingStatus_code, to_Carrier_AirlineID, to_Customer_CustomerID } = booking
         if (!ConnectionID) req.error(400, "Enter a flight", `in/to_Booking(BookingUUID='${BookingUUID}',IsActiveEntity=false)/ConnectionID`)
         if (!FlightDate) req.error(400, "Enter a flight date", `in/to_Booking(BookingUUID='${BookingUUID}',IsActiveEntity=false)/FlightDate`)
@@ -152,7 +167,7 @@ init() {
         if (!to_Carrier_AirlineID) req.error(400, "Enter an airline", `in/to_Booking(BookingUUID='${BookingUUID}',IsActiveEntity=false)/to_Carrier_AirlineID`)
         if (!to_Customer_CustomerID) req.error(400, "Enter a customer", `in/to_Booking(BookingUUID='${BookingUUID}',IsActiveEntity=false)/to_Customer_CustomerID`)
 
-        for (const suppl of booking.to_BookSupplement) {
+        for (const suppl of booking.to_BookSupplement ?? []) {
           const { BookSupplUUID, Price, to_Supplement_SupplementID } = suppl
           if (!Price) req.error(400, "Enter a price", `in/to_Booking(BookingUUID='${BookingUUID}',IsActiveEntity=false)/to_BookSupplement(BookSupplUUID='${BookSupplUUID}',IsActiveEntity=false)/Price`)
           if (!to_Supplement_SupplementID) req.error(400, "Enter a supplement", `in/to_Booking(BookingUUID='${BookingUUID}',IsActiveEntity=false)/to_BookSupplement(BookSupplUUID='${BookSupplUUID}',IsActiveEntity=false)/to_Supplement_SupplementID`)
@@ -160,18 +175,22 @@ init() {
       }
     }
 
-    if (BeginDate < today) req.error (400, `Begin Date ${BeginDate} must not be before today ${today}.`, 'in/BeginDate')
-    if (BeginDate > EndDate) req.error (400, `Begin Date ${BeginDate} must be before End Date ${EndDate}.`, 'in/BeginDate')
+    if (!BeginDate || !EndDate) req.error (400, `Either Begin Date or End Date has not been set`, 'in/BeginDate')
+    if (BeginDate! < today) req.error (400, `Begin Date ${BeginDate} must not be before today ${today}.`, 'in/BeginDate')
+    if (BeginDate! > EndDate!) req.error (400, `Begin Date ${BeginDate} must be before End Date ${EndDate}.`, 'in/BeginDate')
   })
-
 
   //
   // Action Implementations...
   //
+  const { acceptTravel, deductDiscount, rejectTravel } = Travel.actions
 
-  this.on ('acceptTravel', req => UPDATE (req.subject) .with ({TravelStatus_code:'A'}))
-  this.on ('rejectTravel', req => UPDATE (req.subject) .with ({TravelStatus_code:'X'}))
-  this.on ('deductDiscount', async req => {
+  this.on (acceptTravel, req => UPDATE (req.subject) .with ({TravelStatus_code:'A'}))
+  this.on (rejectTravel, req => UPDATE (req.subject) .with ({TravelStatus_code:'X'}))
+  this.on (deductDiscount, 'TravelService', async req => {
+    // FIXME: TS v
+    const subject = req.subject as unknown as string
+    //@ts-ignore FIXME action param invalid
     let discount = req.data.percent / 100
     let succeeded = await UPDATE (req.subject)
       .where `TravelStatus_code != 'A'`
@@ -179,14 +198,16 @@ init() {
       .with (`
         TotalPrice = round (TotalPrice - BookingFee * ${discount}, 3),
         BookingFee = round (BookingFee - BookingFee * ${discount}, 3)
-      `)
+      ` as {})
+      // FIXME: TS ^
     if (!succeeded) { //> let's find out why...
-      let travel = await SELECT.one `TravelID as ID, TravelStatus_code as status, BookingFee` .from (req.subject)
+      let travel = await SELECT.one `TravelID as ID, TravelStatus_code as status, BookingFee` .from (subject)
       if (!travel) throw req.reject (404, `Travel "${travel.ID}" does not exist; may have been deleted meanwhile.`)
       if (travel.status === 'A') req.reject (400, `Travel "${travel.ID}" has been approved already.`)
       if (travel.BookingFee == null) throw req.reject (404, `No discount possible, as travel "${travel.ID}" does not yet have a booking fee added.`)
     } else {
-      return this.read(req.subject)
+      // FIXME: TS v
+      return  this.read<typeof Travel>(subject)
     }
   })
 
@@ -195,4 +216,3 @@ init() {
   return super.init()
 
 }}
-module.exports = {TravelService}
