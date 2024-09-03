@@ -121,6 +121,5 @@
   "sapux": [
     "app/travel_processor",
     "app/travel_analytics"
-  ],
-  "workspaces":["."]
+  ]
 }
