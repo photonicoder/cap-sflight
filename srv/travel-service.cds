@@ -1,4 +1,4 @@
-using { sap.fe.cap.travel as my } from '@capire/sflight';
+using { sap.fe.cap.travel as my } from '../db/schema';
 
 service TravelService @(path:'/processor') {
 
