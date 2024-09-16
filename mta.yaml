@@ -22,8 +22,3 @@ modules:
     build-parameters:
       builder: npm-ci
       ignore: ["node_modules/"]
-
- 
-
-resources:
- 
